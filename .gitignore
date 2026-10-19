@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+data/puzzles.csv
+data/puzzles_part.zst
+build/
