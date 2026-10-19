@@ -266,12 +266,12 @@ def notation_html():
     # pagina di esercizi
     cells = []
     for i, sq in enumerate(SQUARES, 1):
-        cells.append(f'<div class="ex">{hi_board([chess.parse_square(sq)], 190)}<div class="cap"><span><b>A.{i}</b></span><span>Nome della casa</span><span class="tick"></span></div></div>')
+        cells.append(f'<div class="ex">{hi_board([chess.parse_square(sq)], 190)}<div class="cap"><span><b>A.{i}</b></span><span>Nome della casa</span><span class="tick"></span></div><div class="wr">Casa: <span></span></div></div>')
     for i, (b, mv, san) in enumerate(items, 1):
         arrows = [(mv.from_square, mv.to_square)]
         svg = chess.svg.board(b, size=190, arrows=arrows, coordinates=True, colors=COL)
         who = "Bianco" if b.turn else "Nero"
-        cells.append(f'<div class="ex">{svg}<div class="cap"><span><b>B.{i}</b></span><span>Mossa del {who}</span><span class="tick"></span></div></div>')
+        cells.append(f'<div class="ex">{svg}<div class="cap"><span><b>B.{i}</b></span><span>Mossa del {who}</span><span class="tick"></span></div><div class="wr">Mossa: <span></span></div></div>')
     html2 = ('<section><div class="run">Ripasso · Come si scrivono le mosse · Esercizi</div>'
              '<p class="small">A) Scrivi il nome della casa evidenziata. B) La freccia mostra la mossa giocata: scrivila in notazione. Le soluzioni sono in fondo.</p>'
              '<div class="grid g4" style="grid-template-columns:repeat(4,1fr)">' + "".join(cells) + '</div></section>')
@@ -309,6 +309,8 @@ figure svg { display:block; margin:0 auto 2mm; max-width:100%; height:auto; }
 .ex { break-inside: avoid; }
 .ex .cap { font: 10pt Arial, sans-serif; display:flex; justify-content:space-between; margin-top:1mm; }
 .ex .cap b { color: var(--acc); }
+.wr { display:flex; align-items:flex-end; font: 9pt Arial, sans-serif; margin-top: 2mm; }
+.wr span { flex:1; border-bottom: 1px solid #444; margin-left: 2mm; height: 5mm; }
 .ex svg { display:block; width: 62mm; height:auto; margin: 1mm auto 0; }
 .grid.g4 .ex svg { width: 41mm; }
 .notat table.piece td, .notat table.piece th { padding: .5mm 3mm; }
@@ -336,7 +338,7 @@ def ex_cell(num, it, flipped_for_mover=True):
     who = "Bianco" if it["turn"] == "w" else "Nero"
     return (f'<div class="ex">{svg}<div class="cap"><span><b>{num}</b></span>'
             f'<span><span class="who {it["turn"]}"></span>Muove il {who}</span>'
-            f'<span class="tick"></span></div></div>')
+            f'<span class="tick"></span></div><div class="wr">Mossa: <span></span></div></div>')
 
 def sol_text(it):
     if it["alts"]:

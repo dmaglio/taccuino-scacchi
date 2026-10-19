@@ -53,6 +53,8 @@ figure { margin: 1em 0; text-align: center; }
 figcaption, .cap { font-size: .85em; text-align: center; margin: 0 0 1.1em; font-family: sans-serif; }
 table { border-collapse: collapse; margin: .6em auto; font-family: sans-serif; font-size:.9em; }
 td, th { border: 1px solid #888; padding: .15em .6em; }
+.wr { margin: 0 0 1.2em; text-align:center; font-family: sans-serif; font-size:.85em; }
+.wr span { display:inline-block; width: 55%; border-bottom: 1px solid #444; }
 .sol p { margin: .15em 0; font-family: monospace; font-size: .85em; }
 .score { border: 1px solid #2f5d50; padding: .4em .8em; margin: 1em 0; }
 .lines div { border-bottom: 1px solid #aaa; height: 1.8em; }
