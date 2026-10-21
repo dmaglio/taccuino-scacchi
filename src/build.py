@@ -1,8 +1,18 @@
-"""Genera build/taccuino.html (poi PDF con Chrome) dagli esercizi scelti."""
-import html, json, pathlib
+"""Genera build/taccuino.html (poi PDF con Chrome) dagli esercizi scelti.
+
+Con --a5 genera invece build/taccuino-a5.html, impaginato per pagine A5.
+Con --part=1 o --part=2 (in A5) genera uno solo dei due fascicoli: regole e livelli 1-3,
+oppure livelli 4-7, ciascuno con le proprie soluzioni."""
+import html, json, pathlib, sys
 import chess, chess.svg
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+A5 = "--a5" in sys.argv
+PER_PAGE = 4 if A5 else 6      # esercizi per pagina
+G4_COLS = 3 if A5 else 4       # colonne degli esercizi di notazione
+PART = next((int(a.split("=")[1]) for a in sys.argv if a.startswith("--part=")), 0)
+SPLIT = 3                      # ultimo livello del fascicolo 1
+LEVEL_RANGE = {0: range(1, 8), 1: range(1, SPLIT + 1), 2: range(SPLIT + 1, 8)}[PART]
 DATA = json.load(open(ROOT / "data/selected.json"))
 COL = {"square light": "#fbfaf6", "square dark": "#bdb7a6",
        "square light lastmove": "#e9e3b0", "square dark lastmove": "#cfc77e",
@@ -274,7 +284,7 @@ def notation_html():
         cells.append(f'<div class="ex">{svg}<div class="cap"><span><b>B.{i}</b></span><span>Mossa del {who}</span><span class="tick"></span></div><div class="wr">Mossa: <span></span></div></div>')
     html2 = ('<section><div class="run">Ripasso · Come si scrivono le mosse · Esercizi</div>'
              '<p class="small">A) Scrivi il nome della casa evidenziata. B) La freccia mostra la mossa giocata: scrivila in notazione. Le soluzioni sono in fondo.</p>'
-             '<div class="grid g4" style="grid-template-columns:repeat(4,1fr)">' + "".join(cells) + '</div></section>')
+             f'<div class="grid g4" style="grid-template-columns:repeat({G4_COLS},1fr)">' + "".join(cells) + '</div></section>')
     answers = ["<p><b>A</b>&nbsp; " + " &nbsp; ".join(f"{i}) {sq}" for i, sq in enumerate(SQUARES, 1)) + "</p>",
                "<p><b>B</b>&nbsp; " + " &nbsp; ".join(f"{i}) {san}" for i, (_, _, san) in enumerate(items, 1)) + "</p>"]
     return html1 + html2, answers
@@ -331,6 +341,25 @@ table.piece { border-collapse: collapse; font: 10pt Arial, sans-serif; margin: 2
 table.piece td, table.piece th { border:1px solid #999; padding: 1.2mm 4mm; }
 """
 
+CSS_A5 = """
+@page { size: A5; margin: 11mm 11mm 14mm 11mm; }
+body { font-size: 10pt; }
+.cover { height: 182mm; border-left-width: 6mm; padding-left: 9mm; }
+.cover .k { font-size: 90pt; } .cover h1 { font-size: 30pt; } .cover p { font-size: 11.5pt; max-width: 90mm; }
+.lvlhead { gap: 4mm; margin-bottom: 4mm; } .lvlhead .n { font-size: 34pt; } .lvlhead h2 { font-size: 17pt; }
+.figs { gap: 3mm; margin: 4mm 0; }
+.grid { grid-template-rows: repeat(2, auto); gap: 4mm 6mm; }
+.grid.g4 { grid-template-rows: none; gap: 3mm 4mm; }
+.ex svg { width: 50mm; }
+.grid.g4 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.grid.g4 .ex svg { width: 100%; max-width: 34mm; }
+.figs:has(> div) > figure { flex: 0 0 50mm !important; max-width: 50mm; }
+.notat { font-size: 9.5pt !important; line-height: 1.3 !important; }
+.notat table.piece td, .notat table.piece th { padding: .3mm 2mm; }
+.sol { font-size: 7.6pt; column-gap: 6mm; }
+.lines div { height: 8mm; }
+"""
+
 def ex_cell(num, it, flipped_for_mover=True):
     b = chess.Board(it["fen"])
     flip = (it["turn"] == "b")
@@ -356,25 +385,31 @@ def sol_text(it):
     return " ".join(parts)
 
 def main():
-    out = [f"<!doctype html><html lang='it'><meta charset='utf-8'><title>Passo dopo passo</title><style>{CSS}</style><body>"]
-    out.append("""<section class="cover" style="break-before:auto"><div class="k">♞</div>
-<h1>Passo dopo passo</h1><p><b>Taccuino di scacchi a livelli</b><br>Ripasso delle regole, sette livelli e 275 esercizi con soluzione, per chi conosce le regole ma ha poca pratica.</p>
+    out = [f"<!doctype html><html lang='it'><meta charset='utf-8'><title>Passo dopo passo</title><style>{CSS}{CSS_A5 if A5 else ''}</style><body>"]
+    n_ex = sum(len(DATA[str(l)]) for l in LEVEL_RANGE)
+    blurb = {0: f"Ripasso delle regole, sette livelli e {n_ex} esercizi con soluzione, per chi conosce le regole ma ha poca pratica.",
+             1: f"Fascicolo 1 di 2: ripasso delle regole e livelli 1-{SPLIT}, {n_ex} esercizi con soluzione.",
+             2: f"Fascicolo 2 di 2: livelli {SPLIT + 1}-7, {n_ex} esercizi con soluzione. Le regole e come si leggono i diagrammi sono nel fascicolo 1."}[PART]
+    out.append(f"""<section class="cover" style="break-before:auto"><div class="k">♞</div>
+<h1>Passo dopo passo</h1><p><b>Taccuino di scacchi a livelli</b><br>{blurb}</p>
 <p class="small">Esercizi dal database aperto di Lichess (CC0). Testi e impaginazione originali.</p></section>""")
-    # istruzioni
-    out.append("""<section><div class="lvlhead"><div class="n">0</div><h2>Prima di cominciare</h2></div>
-<p><b>Come usarlo.</b> Ogni livello inizia con una breve lezione, poi vengono gli esercizi, dal più facile al più difficile. Fai pochi esercizi ma con attenzione: <b>dieci al giorno</b> valgono più di cinquanta in fretta. Scrivi la soluzione sulla pagina, <b>poi</b> controlla in fondo al libro.</p>
-<p><b>Come si leggono i diagrammi.</b> La scacchiera è sempre vista dalla parte di chi muove (il pezzo in basso è suo). Un bollino <span class="who w"></span> vuol dire che muove il Bianco, un bollino <span class="who b"></span> il Nero. Il quadrato di casa giallo indica l'<b>ultima mossa dell'avversario</b>: spesso ti dice cosa sta minacciando.</p>
-<p><b>Le mosse in notazione.</b> Ogni casa ha un nome: la colonna (da <b>a</b> a <b>h</b>) e la traversa (da <b>1</b> a <b>8</b>). I pezzi si indicano con la lettera italiana:</p>
-<table class="piece"><tr><th>Re</th><th>Donna</th><th>Torre</th><th>Alfiere</th><th>Cavallo</th><th>Pedone</th></tr><tr><td>R</td><td>D</td><td>T</td><td>A</td><td>C</td><td><i>(nessuna)</i></td></tr></table>
-<p><b>x</b> = cattura, <b>+</b> = scacco, <b>#</b> = scacco matto, <b>O-O</b> = arrocco. Esempio: <b>Cxe5+</b> significa «il cavallo cattura in e5 e dà scacco». Un numero con un punto è la mossa del Bianco (<b>12.</b>), con tre punti quella del Nero (<b>12...</b>).</p>
-<p><b>Se non trovi la soluzione.</b> Dopo due minuti, guarda la soluzione e rimetti i pezzi come in diagramma: <i>perché</i> funziona? Una settimana dopo rifai gli esercizi sbagliati. È così che il cervello impara a riconoscere gli schemi.</p>
-<p class="small">Le soluzioni in fondo mostrano la linea principale. In alcuni esercizi esistono altre soluzioni valide, soprattutto nei matti in una mossa dove sono elencate tutte.</p></section>""")
-    out.append(rules_html())
-    nh, nans = notation_html()
-    out.append(nh)
     counts = {}
-    sols = [(0, 'Come si scrivono le mosse', nans)]
-    for lvl in range(1, 8):
+    sols = []
+    if PART != 2:
+        # istruzioni
+        out.append("""<section><div class="lvlhead"><div class="n">0</div><h2>Prima di cominciare</h2></div>
+    <p><b>Come usarlo.</b> Ogni livello inizia con una breve lezione, poi vengono gli esercizi, dal più facile al più difficile. Fai pochi esercizi ma con attenzione: <b>dieci al giorno</b> valgono più di cinquanta in fretta. Scrivi la soluzione sulla pagina, <b>poi</b> controlla in fondo al libro.</p>
+    <p><b>Come si leggono i diagrammi.</b> La scacchiera è sempre vista dalla parte di chi muove (il pezzo in basso è suo). Un bollino <span class="who w"></span> vuol dire che muove il Bianco, un bollino <span class="who b"></span> il Nero. Il quadrato di casa giallo indica l'<b>ultima mossa dell'avversario</b>: spesso ti dice cosa sta minacciando.</p>
+    <p><b>Le mosse in notazione.</b> Ogni casa ha un nome: la colonna (da <b>a</b> a <b>h</b>) e la traversa (da <b>1</b> a <b>8</b>). I pezzi si indicano con la lettera italiana:</p>
+    <table class="piece"><tr><th>Re</th><th>Donna</th><th>Torre</th><th>Alfiere</th><th>Cavallo</th><th>Pedone</th></tr><tr><td>R</td><td>D</td><td>T</td><td>A</td><td>C</td><td><i>(nessuna)</i></td></tr></table>
+    <p><b>x</b> = cattura, <b>+</b> = scacco, <b>#</b> = scacco matto, <b>O-O</b> = arrocco. Esempio: <b>Cxe5+</b> significa «il cavallo cattura in e5 e dà scacco». Un numero con un punto è la mossa del Bianco (<b>12.</b>), con tre punti quella del Nero (<b>12...</b>).</p>
+    <p><b>Se non trovi la soluzione.</b> Dopo due minuti, guarda la soluzione e rimetti i pezzi come in diagramma: <i>perché</i> funziona? Una settimana dopo rifai gli esercizi sbagliati. È così che il cervello impara a riconoscere gli schemi.</p>
+    <p class="small">Le soluzioni in fondo mostrano la linea principale. In alcuni esercizi esistono altre soluzioni valide, soprattutto nei matti in una mossa dove sono elencate tutte.</p></section>""")
+        out.append(rules_html())
+        nh, nans = notation_html()
+        out.append(nh)
+        sols.append((0, 'Come si scrivono le mosse', nans))
+    for lvl in LEVEL_RANGE:
         L = LEVELS[lvl]; items = DATA[str(lvl)]
         if lvl == 7:
             out.append(openings_html())
@@ -383,11 +418,11 @@ def main():
                        f'<p class="goal">{L["goal"]}</p>{L["text"]}')
             out.append('<div class="figs">' + "".join(fig(e) for e in L["examples"]) + '</div>')
             out.append(f'<div class="score"><b>Il tuo punteggio</b> &nbsp; Esercizi risolti: ______ / {len(items)} &nbsp;&nbsp; Data: ____________</div></section>')
-        # esercizi, 6 a pagina
+        # esercizi, PER_PAGE a pagina
         sol_lines = []
         prev_theme = None
         for i, it in enumerate(items, 1):
-            if i == 1 or (i - 1) % 6 == 0 or it["theme"] != prev_theme and prev_theme is not None:
+            if i == 1 or (i - 1) % PER_PAGE == 0 or it["theme"] != prev_theme and prev_theme is not None:
                 # nuova pagina se necessario (cambio tema forza nuova pagina)
                 if i != 1: out.append("</div></section>")
                 label = SECTION_LABEL.get(it["theme"], "")
@@ -414,7 +449,7 @@ def main():
 <p>Gli esercizi provengono dal database dei puzzle di <b>Lichess</b> (lichess.org), rilasciato in pubblico dominio (CC0). Le lezioni, la scelta e l'ordine degli esercizi e l'impaginazione sono originali. Le soluzioni sono state verificate con la libreria <i>python-chess</i> (ogni mossa è legale e i matti sono matti).</p></section>""")
     out.append("</body></html>")
     d = ROOT / "build"; d.mkdir(exist_ok=True)
-    (d / "taccuino.html").write_text("\n".join(out), encoding="utf-8")
+    (d / (f"taccuino-a5-p{PART}.html" if PART else "taccuino-a5.html" if A5 else "taccuino.html")).write_text("\n".join(out), encoding="utf-8")
     print("ok", sum(len(v) for v in DATA.values()))
 
 main()
